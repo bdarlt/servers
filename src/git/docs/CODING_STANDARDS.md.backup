@@ -1,0 +1,506 @@
+# Coding Standards for MCP Server Git
+
+This document outlines the coding standards for the MCP Server Git project. All code must adhere to these standards to maintain consistency and readability across the codebase.
+
+## Overview
+
+- **PEP 8 Compliance**: All code must strictly follow PEP 8 guidelines
+- **Black Formatting**: Black is our auto-formatter of choice - because Black offers no choice
+- **Python 3.12+**: Code must be compatible with Python 3.12 and later versions
+- **Type Hints**: All functions and methods must include type annotations
+- **PEP 695**: Use modern type parameter syntax for generics
+
+## Code Formatting with Black
+
+Black is the authoritative formatter for this project. Key Black settings:
+
+- **Line Length**: 88 characters (Black's default)
+- **String Quotes**: Double quotes preferred
+- **Trailing Commas**: Always used in multi-line structures
+- **Import Formatting**: Black handles import organization automatically
+
+### Running Black
+
+```bash
+# Format all Python files
+black src/ tests/
+
+# Check formatting without making changes
+black --check src/ tests/
+
+# Show diff of changes that would be made
+black --diff src/ tests/
+```
+
+## Import Conventions
+
+Based on the existing codebase and PEP 8:
+
+### Import Order
+1. Standard library imports
+2. Third-party library imports  
+3. Local application imports
+
+### Import Style
+```python
+# Standard library - separate lines
+import logging
+import sys
+from pathlib import Path
+from typing import Sequence, Optional
+
+# Third-party - separate lines
+import click
+import git
+from git.exc import BadName
+from pydantic import BaseModel, Field
+
+# Local imports - relative imports preferred
+from .server import serve
+```
+
+### Import Guidelines
+- Use absolute imports for third-party packages
+- Use relative imports for local modules (`.server` instead of `mcp_server_git.server`)
+- Import specific exceptions rather than entire modules when possible
+- Group imports by category with blank lines between groups
+
+## Type Annotations
+
+All functions and methods must include type annotations:
+
+```python
+# Good
+def git_status(repo: git.Repo) -> str:
+    return repo.git.status()
+
+# Good with optional parameters
+def git_log(
+    repo: git.Repo, 
+    max_count: int = 10, 
+    start_timestamp: Optional[str] = None
+) -> list[str]:
+    # implementation
+
+# Good with Union types
+def validate_repo_path(repo_path: Path, allowed_repository: Path | None) -> None:
+    # implementation
+```
+
+### Type Annotation Guidelines
+- Use `Optional[T]` for nullable parameters
+- Use `Path | None` syntax for Python 3.10+ (preferred over `Optional[Path]`)
+- Use `list[str]`, `dict[str, int]` instead of `List[str]`, `Dict[str, int]`
+- Use `|` union operator for Python 3.10+ instead of `Union[T1, T2]`
+- Use `Sequence[T]` for read-only sequences when appropriate (as seen in existing codebase)
+
+### Generics and Type Variables
+Use PEP 695 syntax for all new generic functionality:
+
+```python
+# Modern approach (Python 3.12+, preferred)
+def process_items[T](items: Sequence[T]) -> list[T]:
+    return list(items)
+
+class Repository[T]:
+    pass
+
+# For bounded type parameters
+def sortable_items[T: Comparable](items: Sequence[T]) -> list[T]:
+    return sorted(items)
+
+# For multiple type parameters
+class Pair[T, U]:
+    def __init__(self, first: T, second: U) -> None:
+        self.first = first
+        self.second = second
+```
+
+**Migration note**: Existing code using traditional `TypeVar` syntax can remain as-is, but new code should prefer PEP 695 syntax.
+
+## Naming Conventions
+
+Following PEP 8 and existing patterns:
+
+### Functions and Methods
+- Use `snake_case` for function names
+- Be descriptive but concise
+- Use verbs for action functions
+
+```python
+def git_status(repo: git.Repo) -> str:
+def validate_repo_path(repo_path: Path, allowed_repository: Path | None) -> None:
+def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
+```
+
+### Classes
+- Use `PascalCase` for class names
+- Use descriptive nouns
+
+```python
+class GitStatus(BaseModel):
+class GitDiffUnstaged(BaseModel):
+class GitTools(str, Enum):
+```
+
+### Constants and Enums
+- Use `UPPER_SNAKE_CASE` for constants
+- Enum values should be descriptive strings
+
+```python
+DEFAULT_CONTEXT_LINES = 3
+
+class GitTools(str, Enum):
+    STATUS = "git_status"
+    DIFF_UNSTAGED = "git_diff_unstaged"
+    DIFF_STAGED = "git_diff_staged"
+```
+
+### Variables and Parameters
+- Use `snake_case` for variables
+- Be descriptive but avoid excessive length
+- Use `repo` instead of `repository` for brevity when context is clear
+
+```python
+repo_path = Path(arguments["repo_path"])
+result = git_diff(repo, target, context_lines)
+```
+
+## Code Structure
+
+### Function Design
+- Functions should have a single, clear purpose
+- Keep functions reasonably short (under 50 lines when possible)
+- Use early returns for error cases to reduce nesting
+- Document complex logic with inline comments
+
+```python
+def git_diff(repo: git.Repo, target: str, context_lines: int = DEFAULT_CONTEXT_LINES) -> str:
+    # Defense in depth: reject targets starting with '-' to prevent flag injection
+    if target.startswith("-"):
+        raise BadName(f"Invalid target: '{target}' - cannot start with '-'")
+    repo.rev_parse(target)  # Validates target is a real git ref
+    return repo.git.diff(f"--unified={context_lines}", target)
+```
+
+### Error Handling
+- Use specific exceptions rather than generic ones
+- Provide meaningful error messages
+- Validate inputs early and fail fast
+
+```python
+# Good - specific exception with clear message
+if target.startswith("-"):
+    raise BadName(f"Invalid target: '{target}' - cannot start with '-'")
+
+# Good - early validation
+try:
+    resolved_repo = repo_path.resolve()
+    resolved_allowed = allowed_repository.resolve()
+except (OSError, RuntimeError):
+    raise ValueError(f"Invalid path: {repo_path}")
+```
+
+### Security Considerations
+- Always validate user input that could be passed to shell commands
+- Use defense-in-depth approaches
+- Sanitize file paths and command arguments
+
+```python
+# Good - prevents flag injection
+if branch_name.startswith("-"):
+    raise BadName(f"Invalid branch name: '{branch_name}' - cannot start with '-'")
+
+# Good - prevents path traversal
+try:
+    resolved_repo.relative_to(resolved_allowed)
+except ValueError:
+    raise ValueError(
+        f"Repository path '{repo_path}' is outside the allowed repository '{allowed_repository}'"
+    )
+```
+
+## Documentation
+
+### Docstrings
+All public functions, classes, and methods should have docstrings:
+
+```python
+def validate_repo_path(repo_path: Path, allowed_repository: Path | None) -> None:
+    """Validate that repo_path is within the allowed repository path."""
+    # implementation
+```
+
+### Complex Functions
+For functions with complex logic, include inline comments:
+
+```python
+def git_log(repo: git.Repo, max_count: int = 10, start_timestamp: Optional[str] = None, end_timestamp: Optional[str] = None) -> list[str]:
+    if start_timestamp or end_timestamp:
+        # Use git log command with date filtering
+        args = []
+        if start_timestamp:
+            args.extend(['--since', start_timestamp])
+        if end_timestamp:
+            args.extend(['--until', end_timestamp])
+        args.extend(['--format=%H%n%an%n%ad%n%s%n'])
+        
+        # Process commits in groups of 4 (hash, author, date, message)
+        log_output = repo.git.log(*args).split('\n')
+        log = []
+        for i in range(0, len(log_output), 4):
+            if i + 3 < len(log_output) and len(log) < max_count:
+                log.append(
+                    f"Commit: {log_output[i]}\n"
+                    f"Author: {log_output[i+1]}\n"
+                    f"Date: {log_output[i+2]}\n"
+                    f"Message: {log_output[i+3]}\n"
+                )
+        return log
+```
+
+## Testing Standards
+
+### Test Structure
+- Use descriptive test function names
+- Follow the existing pattern in `test_server.py`
+- Group related tests together
+
+```python
+def test_git_checkout_existing_branch(test_repository):
+    test_repository.git.branch("test-branch")
+    result = git_checkout(test_repository, "test-branch")
+    
+    assert "Switched to branch 'test-branch'" in result
+    assert test_repository.active_branch.name == "test-branch"
+```
+
+### Test Fixtures
+- Use pytest fixtures for common test setup
+- Clean up resources after tests
+- Make fixtures reusable across test functions
+
+```python
+@pytest.fixture
+def test_repository(tmp_path: Path):
+    repo_path = tmp_path / "temp_test_repo"
+    test_repo = git.Repo.init(repo_path)
+    
+    Path(repo_path / "test.txt").write_text("test")
+    test_repo.index.add(["test.txt"])
+    test_repo.index.commit("initial commit")
+    
+    yield test_repo
+    
+    shutil.rmtree(repo_path)
+```
+
+## Modern Python Features
+
+### Python 3.10+ Features
+Use modern Python features where appropriate:
+
+```python
+# Use match-case statements (Python 3.10+)
+match branch_type:
+    case 'local':
+        b_type = None
+    case 'remote':
+        b_type = "-r"
+    case 'all':
+        b_type = "-a"
+    case _:
+        return f"Invalid branch type: {branch_type}"
+
+# Use | union operator (Python 3.10+)
+def validate_repo_path(repo_path: Path, allowed_repository: Path | None) -> None:
+```
+
+### PEP 695: Type Parameter Syntax (Python 3.12+)
+PEP 695 introduces a new, more concise syntax for generic classes and functions. **This project now supports and encourages using PEP 695 syntax**:
+
+```python
+# Modern PEP 695 syntax (preferred)
+def process_repositories[T](repos: Sequence[T]) -> list[T]:
+    return list(repos)
+
+class RepositoryManager[T]:
+    def __init__(self, repo: T) -> None:
+        self.repo = repo
+    
+    def get_repo(self) -> T:
+        return self.repo
+
+# Type aliases with PEP 695
+type Point = tuple[float, float]
+type RepositoryPath = str | Path
+
+# Generic type aliases
+type Vector[T] = tuple[T, T, T]
+type Handler[T, U] = Callable[[T], U]
+type Validator[T] = Callable[[T], bool]
+type Handler[T, U] = Callable[[T], U]
+```
+
+**Migration from traditional syntax**: When modifying existing generic code, consider updating to PEP 695 syntax:
+
+```python
+# Traditional syntax (still valid, but prefer PEP 695)
+from typing import TypeVar, Generic
+
+T = TypeVar('T')
+
+class RepositoryManager(Generic[T]):
+    pass
+
+# Preferred PEP 695 syntax
+class RepositoryManager[T]:
+    pass
+```
+
+### Organizing Types with PEP 695
+For complex projects, create dedicated type modules using PEP 695:
+
+```python
+# src/mcp_server_git/types.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Callable
+
+# Domain-specific type aliases
+type RepositoryPath = str | Path
+type CommitHash = str
+type BranchName = str
+type FilePath = str | Path
+
+# Generic utilities
+type Handler[T, U] = Callable[[T], U]
+type Validator[T] = Callable[[T], bool]
+
+# Git-specific types
+type GitResult = str
+type GitError = str
+
+class RepositoryResult[T]:
+    """Generic result wrapper for repository operations."""
+    
+    def __init__(self, value: T | None = None, error: GitError | None = None) -> None:
+        self.value = value
+        self.error = error
+```
+
+**Guidelines for type modules:**
+- Create `types.py` modules when you have more than 3-4 related type definitions
+- Use domain-specific names for type aliases (e.g., `RepositoryPath` instead of just `Path`)
+- Group related types together with comments
+- Export types in `__init__.py` for easy importing
+
+### Walrus Operator
+Use the walrus operator when it improves readability:
+
+```python
+# Good - avoids duplicate computation
+if (result := expensive_computation()) is not None:
+    return result
+```
+
+## Git Commit Style
+
+Follow conventional commit format:
+
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Test additions or changes
+- `chore`: Maintenance tasks
+
+Examples:
+```
+feat(server): add git branch listing functionality
+fix(security): prevent path traversal in validate_repo_path
+docs: update coding standards with Black formatting rules
+test: add validation tests for malicious git refs
+```
+
+## Code Review Checklist
+
+Before submitting code for review:
+
+1. **Formatting**: Run Black on all modified files
+2. **Type Checking**: Ensure all functions have type annotations
+3. **Imports**: Verify imports follow the established order and style
+4. **Naming**: Check that all names follow PEP 8 conventions
+5. **Documentation**: Add docstrings to public functions and classes
+6. **Testing**: Write tests for new functionality
+7. **Security**: Validate all user inputs that could affect system operations
+8. **Error Handling**: Use appropriate exceptions and error messages
+
+## Tools and Automation
+
+### Required Tools
+- **Black**: Code formatting
+- **Ruff**: Linting (already configured in pyproject.toml)
+- **ty**: Type checking (already configured in pyproject.toml) - 8-10x faster than pyright
+
+### Running Quality Checks
+```bash
+# Format code
+black src/ tests/
+
+# Run linting
+ruff check src/ tests/
+
+# Run type checking
+ty check src/ tests/
+
+# Run tests
+pytest
+```
+
+### IDE Integration
+Configure your IDE to:
+- Run Black on save
+- Show type checking errors
+- Highlight PEP 8 violations
+- Run tests automatically
+
+### Type Checker Choice: ty vs pyright
+This project uses **ty** instead of pyright for the following reasons:
+
+**Performance**: ty is 8-10x faster than pyright
+- ty: ~1 second for full codebase analysis
+- pyright: ~8 seconds for the same analysis
+
+**Features**: Both tools provide comprehensive type checking, but ty offers:
+- Richer diagnostics with contextual information
+- Better support for partially typed code
+- Advanced features like intersection types and sophisticated narrowing
+- First-class project support with configurable rule levels
+
+**Compatibility**: ty is fully compatible with Python's typing system and provides the same level of type safety as pyright.
+
+**Migration**: If you need to switch back to pyright for any reason, simply replace `ty check` with `pyright` in the commands above.
+
+## Additional Resources
+
+- [PEP 8 Style Guide](https://pep8.org/)
+- [Black Code Formatter](https://black.readthedocs.io/)
+- [Python Type Hints](https://docs.python.org/3/library/typing.html)
+- [The Hitchhiker's Guide to Python](https://docs.python-guide.org/writing/style/)
+- [Implementing PEP 695](https://jellezijlstra.github.io/pep695.html)
+
+---
+
+*This document should be updated as the project evolves and new patterns emerge. When in doubt, follow PEP 8 and existing code patterns in the repository.*
