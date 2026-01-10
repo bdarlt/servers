@@ -5,7 +5,8 @@ This document lists the ADRs that should be created for this project, prioritize
 ## High Priority (Create These Next)
 
 ### 1. Python 3.12+ Version Requirement
-**Status**: 📝 **NEEDED**  
+**Status**: ✅ **COMPLETED**  
+**File**: [0002-require-python-312-minimum-version.md](0002-require-python-312-minimum-version.md)  
 **Why High Priority**: This decision affects the entire user base and locks out users with older Python versions. It's a fundamental constraint that should be documented.
 **Key Decision**: Require Python 3.12+ minimum version
 **Alternatives**: Support 3.10+, 3.11+, or maintain broader compatibility

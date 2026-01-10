@@ -22,6 +22,12 @@ Architecture Decision Records (ADRs) are short documents that capture a single a
 **Decision**: Adopt Black for automated code formatting to eliminate bike shedding and reduce cognitive load  
 **Impact**: Zero-configuration formatting that enforces consistency across the codebase
 
+### [0002: Require Python 3.12 Minimum Version](0002-require-python-312-minimum-version.md)
+**Status**: Accepted  
+**Date**: 2026-01-10  
+**Decision**: Require Python 3.12+ to enable PEP 695 type parameter syntax and modern typing features  
+**Impact**: Enables clean, modern type annotations while container distribution mitigates compatibility concerns
+
 ## Naming Convention
 
 ADR files should follow this pattern:

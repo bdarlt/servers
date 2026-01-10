@@ -15,6 +15,8 @@ from mcp_server_git.server import (
     git_log,
     git_create_branch,
     git_show,
+    git_symbolic_ref,
+    git_default_remote_branch,
     validate_repo_path,
 )
 import shutil
@@ -278,6 +280,58 @@ def test_git_show_initial_commit(test_repository):
     assert "Commit:" in result
     assert "initial commit" in result
     assert "test.txt" in result
+
+
+def test_git_symbolic_ref_head(test_repository):
+    """Test reading HEAD symbolic reference."""
+    result = git_symbolic_ref(test_repository, "HEAD")
+
+    # Should return the full ref path
+    assert result.startswith("refs/heads/")
+    assert "master" in result or "main" in result
+
+
+def test_git_symbolic_ref_head_short(test_repository):
+    """Test reading HEAD symbolic reference with short option."""
+    result = git_symbolic_ref(test_repository, "HEAD", short=True)
+
+    # Should return just the branch name
+    assert result in ["master", "main"]
+
+
+def test_git_symbolic_ref_invalid_ref(test_repository):
+    """Test that non-symbolic refs raise ValueError."""
+    # Create a non-symbolic ref (a regular commit hash)
+    commit_sha = test_repository.head.commit.hexsha
+
+    with pytest.raises(ValueError) as exc_info:
+        git_symbolic_ref(test_repository, commit_sha)
+
+    assert "not a symbolic ref" in str(exc_info.value)
+
+
+def test_git_symbolic_ref_rejects_flag_injection(test_repository):
+    """Test that git_symbolic_ref rejects ref names starting with '-'."""
+    with pytest.raises(git.exc.BadName) as exc_info:
+        git_symbolic_ref(test_repository, "--help")
+
+    assert "cannot start with '-'" in str(exc_info.value)
+
+
+def test_git_default_remote_branch_no_remote(test_repository):
+    """Test default remote branch when no remote exists."""
+    with pytest.raises(ValueError) as exc_info:
+        git_default_remote_branch(test_repository, "origin")
+
+    assert "Could not determine default branch" in str(exc_info.value)
+
+
+def test_git_default_remote_branch_rejects_flag_injection(test_repository):
+    """Test that git_default_remote_branch rejects remote names starting with '-'."""
+    with pytest.raises(git.exc.BadName) as exc_info:
+        git_default_remote_branch(test_repository, "--help")
+
+    assert "cannot start with '-'" in str(exc_info.value)
 
 
 # Tests for validate_repo_path (repository scoping security fix)

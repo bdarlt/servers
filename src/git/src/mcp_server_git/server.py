@@ -83,6 +83,32 @@ class GitShow(BaseModel):
     revision: str
 
 
+class GitSymbolicRef(BaseModel):
+    repo_path: str = Field(
+        ...,
+        description="The path to the Git repository.",
+    )
+    ref_name: str = Field(
+        ...,
+        description="The name of the symbolic reference to read (e.g., 'HEAD', 'refs/remotes/origin/HEAD').",
+    )
+    short: bool = Field(
+        False,
+        description="If True, return only the short name (e.g., 'main' instead of 'refs/heads/main').",
+    )
+
+
+class GitDefaultRemoteBranch(BaseModel):
+    repo_path: str = Field(
+        ...,
+        description="The path to the Git repository.",
+    )
+    remote_name: str = Field(
+        "origin",
+        description="The name of the remote (default: 'origin').",
+    )
+
+
 class GitBranch(BaseModel):
     repo_path: str = Field(
         ...,
@@ -116,6 +142,8 @@ class GitTools(str, Enum):
     SHOW = "git_show"
 
     BRANCH = "git_branch"
+    SYMBOLIC_REF = "git_symbolic_ref"
+    DEFAULT_REMOTE_BRANCH = "git_default_remote_branch"
 
 
 def git_status(repo: git.Repo) -> str:
@@ -252,6 +280,94 @@ def git_show(repo: git.Repo, revision: str) -> str:
     return "".join(output)
 
 
+def git_symbolic_ref(repo: git.Repo, ref_name: str, short: bool = False) -> str:
+    """Read the value of a symbolic reference.
+
+    Args:
+        repo: The git repository
+        ref_name: The name of the symbolic reference to read (e.g., 'HEAD')
+        short: If True, return only the short name (e.g., 'main' instead of 'refs/heads/main')
+
+    Returns:
+        The value of the symbolic reference
+
+    Raises:
+        ValueError: If the reference is not a symbolic ref
+    """
+    # Security: Prevent argument injection by validating ref_name
+    if ref_name.startswith("-"):
+        raise BadName(f"Invalid ref name: '{ref_name}' - cannot start with '-'")
+
+    try:
+        if short:
+            return repo.git.symbolic_ref(f"--short {ref_name}")
+        else:
+            return repo.git.symbolic_ref(ref_name)
+    except git.exc.GitCommandError as e:
+        # Check if it's because the ref is not a symbolic ref
+        if "not a symbolic ref" in str(e):
+            raise ValueError(f"Reference '{ref_name}' is not a symbolic ref")
+        else:
+            raise
+
+
+def git_default_remote_branch(repo: git.Repo, remote_name: str = "origin") -> str:
+    """Get the default branch for a remote repository.
+
+    Args:
+        repo: The git repository
+        remote_name: The name of the remote (default: 'origin')
+
+    Returns:
+        The name of the default branch for the remote
+
+    Raises:
+        ValueError: If the remote doesn't exist or doesn't have a HEAD reference
+    """
+    # Security: Prevent argument injection by validating remote_name
+    if remote_name.startswith("-"):
+        raise BadName(f"Invalid remote name: '{remote_name}' - cannot start with '-'")
+
+    ref_name = f"refs/remotes/{remote_name}/HEAD"
+
+    try:
+        # Try to read the symbolic ref for the remote HEAD
+        default_branch_ref = git_symbolic_ref(repo, ref_name)
+
+        # Extract the branch name from the ref
+        # (e.g., "refs/remotes/origin/main" -> "main")
+        if default_branch_ref.startswith(f"refs/remotes/{remote_name}/"):
+            return default_branch_ref[len(f"refs/remotes/{remote_name}/") :]
+        else:
+            return default_branch_ref
+
+    except ValueError:
+        # If the remote HEAD is not a symbolic ref, try to get it from remote config
+        try:
+            remote = repo.remote(remote_name)
+            # Get the remote's HEAD branch from config
+            remote_head = remote.refs[0].remote_head
+            if remote_head:
+                return remote_head
+            else:
+                # Fallback: try to get the default branch from remote tracking branches
+                # This is a heuristic approach
+                tracking_branches = [
+                    ref.name
+                    for ref in repo.references
+                    if ref.name.startswith(f"refs/remotes/{remote_name}/")
+                ]
+                if tracking_branches:
+                    # Return the first tracking branch as a fallback
+                    return tracking_branches[0].split("/")[-1]
+        except (git.exc.GitCommandError, IndexError):
+            pass
+
+        raise ValueError(
+            f"Could not determine default branch for remote '{remote_name}'"
+        )
+
+
 def validate_repo_path(repo_path: Path, allowed_repository: Path | None) -> None:
     """Validate that repo_path is within the allowed repository path."""
     if allowed_repository is None:
@@ -383,6 +499,16 @@ async def serve(repository: Path | None) -> None:
                 description="List Git branches",
                 inputSchema=GitBranch.model_json_schema(),
             ),
+            Tool(
+                name=GitTools.SYMBOLIC_REF,
+                description="Read the value of a symbolic reference (read-only)",
+                inputSchema=GitSymbolicRef.model_json_schema(),
+            ),
+            Tool(
+                name=GitTools.DEFAULT_REMOTE_BRANCH,
+                description="Get the default branch for a remote repository",
+                inputSchema=GitDefaultRemoteBranch.model_json_schema(),
+            ),
         ]
 
     async def list_repos() -> Sequence[str]:
@@ -501,6 +627,21 @@ async def serve(repository: Path | None) -> None:
                     arguments.get("branch_type", "local"),
                     arguments.get("contains", None),
                     arguments.get("not_contains", None),
+                )
+                return [TextContent(type="text", text=result)]
+
+            case GitTools.SYMBOLIC_REF:
+                result = git_symbolic_ref(
+                    repo,
+                    arguments["ref_name"],
+                    arguments.get("short", False),
+                )
+                return [TextContent(type="text", text=result)]
+
+            case GitTools.DEFAULT_REMOTE_BRANCH:
+                result = git_default_remote_branch(
+                    repo,
+                    arguments.get("remote_name", "origin"),
                 )
                 return [TextContent(type="text", text=result)]
 
