@@ -31,10 +31,30 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["ty>=0.0.11", "ruff>=0.7.3", "pytest>=8.0.0", "black>=24.0.0"]
+dev = [
+    "ty>=0.0.11",
+    "ruff>=0.7.3",
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+    "bandit>=1.7.8",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+
+[tool.bandit]
+# Exclude common test and documentation directories
+exclude_dirs = ["tests", "docs", ".venv", ".git"]
+# Set the confidence level for reporting issues
+confidence_level = "MEDIUM"
+# Set the severity level for reporting issues
+severity_level = "MEDIUM"
+# Enable/disable specific tests by ID
+skips = ["B101", "B608"]  # Skip assert_used and sql_injection checks for now
+# Enable recursive scanning
+recursive = true
+# Set the output format
+format = "txt"

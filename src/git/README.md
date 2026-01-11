@@ -330,6 +330,35 @@ If you are doing local development, there are two ways to test your changes:
 }
 ```
 
+## Security
+
+This project uses [Bandit](https://bandit.readthedocs.io/) for security scanning to identify common security issues in Python code.
+
+### Running Security Scans
+
+To run a security scan:
+
+```bash
+uv run bandit -c bandit.yaml -r src/
+```
+
+Or using the pyproject.toml configuration:
+
+```bash
+uv run bandit -c pyproject.toml -r src/
+```
+
+### Configuration
+
+The security scanner is configured with:
+- **Excluded directories**: `tests/`, `docs/`, `.venv/`, `.git/`, `__pycache__/`
+- **Confidence level**: MEDIUM
+- **Severity level**: MEDIUM
+- **Skipped tests**: B101 (assert_used), B608 (hardcoded_sql_expressions)
+- **Recursive scanning**: Enabled
+
+You can modify the configuration in either `bandit.yaml` or the `[tool.bandit]` section in `pyproject.toml`.
+
 ## Build
 
 Docker build:

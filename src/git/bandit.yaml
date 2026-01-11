@@ -1,0 +1,57 @@
+# Bandit configuration file
+# This file contains settings for the bandit security scanner
+
+# Directories to exclude from scanning
+exclude_dirs:
+  - tests
+  - docs
+  - .venv
+  - .git
+  - __pycache__
+
+# Tests to skip (by test ID)
+skips:
+  - B101  # assert_used
+  - B608  # hardcoded_sql_expressions
+
+# Confidence level (LOW, MEDIUM, HIGH)
+confidence_level: MEDIUM
+
+# Severity level (LOW, MEDIUM, HIGH)
+severity_level: MEDIUM
+
+# Enable recursive directory scanning
+recursive: true
+
+# Output format (txt, html, json, etc.)
+format: txt
+
+# Verbosity level
+# verbose: 0
+
+# Debug mode
+# debug: false
+
+# Show only the start line of each issue
+# show_issue_start_line: false
+
+# Show the source code where issues were found
+# show_source: false
+
+# Number of context lines to show
+# context_lines: 3
+
+# Baseline file to compare against
+# baseline: 
+
+# Configuration file to use
+# config: 
+
+# Exit code when issues are found (0 to ignore, non-zero to fail)
+# exit_code: 0
+
+# Target Python version
+target: python3
+
+# Profile to use (default, secure, etc.)
+# profile: default
