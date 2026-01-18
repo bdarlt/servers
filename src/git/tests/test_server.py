@@ -356,7 +356,7 @@ def test_git_symbolic_ref_invalid_ref(test_repository):
 
 def test_git_symbolic_ref_rejects_flag_injection(test_repository):
     """Test that git_symbolic_ref rejects ref names starting with '-'."""
-    with pytest.raises(git.exc.BadName) as exc_info:
+    with pytest.raises(git.BadName) as exc_info:
         git_symbolic_ref(test_repository, "--help")
 
     assert "cannot start with '-'" in str(exc_info.value)
@@ -374,7 +374,7 @@ def test_git_default_remote_branch_no_remote(test_repository):
 
 def test_git_default_remote_branch_rejects_flag_injection(test_repository):
     """Test that git_default_remote_branch rejects remote names starting with '-'."""
-    with pytest.raises(git.exc.BadName) as exc_info:
+    with pytest.raises(git.BadName) as exc_info:
         git_default_remote_branch(test_repository, "--help")
 
     assert "cannot start with '-'" in str(exc_info.value)
