@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.13-alpine3.23
 
 # Install Git (and optionally git-lfs/openssh if needed)
-RUN apk add --no-cache git git-lfs
+RUN apk add --no-cache git=2.52.0-r0 git-lfs=3.7.0-r4
 
 WORKDIR /app
 
