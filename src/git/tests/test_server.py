@@ -56,7 +56,7 @@ def test_repository(tmp_path: Path):
             
             shutil.rmtree(repo_path, onerror=remove_readonly)
             break
-        except (PermissionError, OSError) as e:
+        except (PermissionError, OSError):
             if attempt == max_attempts - 1:
                 # If we still can't delete, try to at least clean up what we can
                 try:
