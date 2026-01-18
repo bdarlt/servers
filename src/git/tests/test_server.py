@@ -35,25 +35,28 @@ def test_repository(tmp_path: Path):
 
     # Close the repository to release file handles before cleanup
     test_repo.close()
-    
+
     # Force garbage collection to release any remaining references
     import gc
+
     gc.collect()
-    
+
     # Robust cleanup with retry for Windows file locking issues
     import time
+
     max_attempts = 10
     for attempt in range(max_attempts):
         try:
             # Use onerror handler to handle individual file issues
             def remove_readonly(func, path, _):
                 import os
+
                 try:
                     os.chmod(path, 0o777)  # Make writable
                     func(path)
                 except Exception:
                     pass
-            
+
             shutil.rmtree(repo_path, onerror=remove_readonly)
             break
         except (PermissionError, OSError) as e:
@@ -61,6 +64,7 @@ def test_repository(tmp_path: Path):
                 # If we still can't delete, try to at least clean up what we can
                 try:
                     import os
+
                     for root, dirs, files in os.walk(repo_path, topdown=False):
                         for name in files:
                             try:
@@ -89,7 +93,6 @@ def test_git_checkout_existing_branch(test_repository):
 
 
 def test_git_checkout_nonexistent_branch(test_repository):
-
     with pytest.raises(BadName):
         git_checkout(test_repository, "nonexistent-branch")
 
@@ -356,7 +359,7 @@ def test_git_symbolic_ref_invalid_ref(test_repository):
 
 def test_git_symbolic_ref_rejects_flag_injection(test_repository):
     """Test that git_symbolic_ref rejects ref names starting with '-'."""
-    with pytest.raises(git.BadName) as exc_info:
+    with pytest.raises(git.exc.BadName) as exc_info:
         git_symbolic_ref(test_repository, "--help")
 
     assert "cannot start with '-'" in str(exc_info.value)
@@ -369,12 +372,15 @@ def test_git_default_remote_branch_no_remote(test_repository):
 
     error_msg = str(exc_info.value)
     # Accept either error message depending on Git configuration
-    assert "Could not determine default branch" in error_msg or "Remote named 'origin' didn't exist" in error_msg
+    assert (
+        "Could not determine default branch" in error_msg
+        or "Remote named 'origin' didn't exist" in error_msg
+    )
 
 
 def test_git_default_remote_branch_rejects_flag_injection(test_repository):
     """Test that git_default_remote_branch rejects remote names starting with '-'."""
-    with pytest.raises(git.BadName) as exc_info:
+    with pytest.raises(git.exc.BadName) as exc_info:
         git_default_remote_branch(test_repository, "--help")
 
     assert "cannot start with '-'" in str(exc_info.value)
@@ -432,7 +438,7 @@ def test_validate_repo_path_symlink_escape(tmp_path: Path):
     """Symlinks pointing outside allowed_repository should be rejected."""
     import platform
     import os
-    
+
     allowed = tmp_path / "allowed_repo"
     allowed.mkdir()
     outside = tmp_path / "outside"
@@ -440,7 +446,7 @@ def test_validate_repo_path_symlink_escape(tmp_path: Path):
 
     # Create a symlink inside allowed that points outside
     symlink = allowed / "escape_link"
-    
+
     try:
         # Try to create symlink - this may fail on Windows without admin privileges
         if platform.system() == "Windows":
@@ -449,12 +455,12 @@ def test_validate_repo_path_symlink_escape(tmp_path: Path):
         else:
             # On Linux/Unix, use regular symlink
             os.symlink(str(outside), str(symlink))
-        
+
         # If symlink creation succeeded, test the validation
         with pytest.raises(ValueError) as exc_info:
             validate_repo_path(symlink, allowed)
         assert "outside the allowed repository" in str(exc_info.value)
-        
+
     except (OSError, PermissionError):
         # On Windows without admin privileges, symlink creation fails
         # This is expected behavior, so we skip the test

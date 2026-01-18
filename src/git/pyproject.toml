@@ -37,6 +37,7 @@ dev = [
     "pytest>=8.0.0",
     "black>=24.0.0",
     "bandit>=1.7.8",
+    "pyright>=1.1.408",
 ]
 
 [tool.pytest.ini_options]
@@ -58,3 +59,8 @@ skips = ["B101", "B608"]  # Skip assert_used and sql_injection checks for now
 recursive = true
 # Set the output format
 format = "txt"
+
+[tool.ty.rules]
+# Ensure attribute-related rules are strict
+attribute-access = "error"
+
