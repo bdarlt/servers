@@ -57,6 +57,7 @@ jobs:
           echo "pypi_packages=$PYPI" >> $GITHUB_OUTPUT
 
       - name: Create npm matrix
+        if: false
         id: create-npm-packages
         run: |
           HASH="${{ steps.last-release.outputs.hash }}"
