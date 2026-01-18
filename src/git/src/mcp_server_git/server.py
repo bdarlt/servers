@@ -300,7 +300,7 @@ def git_symbolic_ref(repo: git.Repo, ref_name: str, short: bool = False) -> str:
 
     try:
         if short:
-            return repo.git.symbolic_ref(f"--short {ref_name}")
+            return repo.git.symbolic_ref("--short", ref_name)
         else:
             return repo.git.symbolic_ref(ref_name)
     except git.exc.GitCommandError as e:
@@ -360,7 +360,7 @@ def git_default_remote_branch(repo: git.Repo, remote_name: str = "origin") -> st
                 if tracking_branches:
                     # Return the first tracking branch as a fallback
                     return tracking_branches[0].split("/")[-1]
-        except (git.exc.GitCommandError, IndexError):
+        except (git.exc.GitCommandError, IndexError, git.exc.NoSuchPathError):
             pass
 
         raise ValueError(
